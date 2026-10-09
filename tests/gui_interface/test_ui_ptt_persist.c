@@ -102,6 +102,13 @@ const char *bcast_car_state_name(bcast_car_state_t st) { (void)st; return "idle"
 bool  modem_get_rx_freq_offset(float *hz, uint64_t *age_ms) { (void)hz; (void)age_ms; return false; }
 void  modem_set_spectrum_enabled(bool enabled) { (void)enabled; }
 void  modem_set_tx_gain(float linear) { (void)linear; }
+void  modem_get_ldpc_status(int *last_iters, float *mean_iters, int *deadline_hits, int *max_iter)
+{
+    if (last_iters) *last_iters = 0;
+    if (mean_iters) *mean_iters = 0.0f;
+    if (deadline_hits) *deadline_hits = 0;
+    if (max_iter) *max_iter = 0;
+}
 
 char *msg_store_snapshot(size_t *count_out, size_t *len_out)
 { if (count_out) *count_out = 0; if (len_out) *len_out = 0; return NULL; }
