@@ -105,10 +105,15 @@ int  modem_get_tx_delay_ms(void);
 // silent.
 float modem_get_tx_peak_dbfs(void);
 
-// The carrier offset the last frame decoded arrived at, in Hz (positive: above
-// nominal), and how long ago that was.  False until a decoder has measured
-// one.  Either pointer may be NULL.
 bool modem_get_rx_freq_offset(float *hz, uint64_t *age_ms);
+
+/* LDPC decoder policy (from [ldpc] in mercury.ini) and live statistics.
+ * budget_ms 0 derives a per-mode budget: min(guard_frac * ARQ channel guard,
+ * air_frac * frame airtime).  alg is an LDPC_ALG_* value (ldpc_ctx.h). */
+void modem_set_ldpc_policy(int max_iter, float budget_ms, float guard_frac,
+                           float air_frac, int alg);
+void modem_get_ldpc_status(int *last_iters, float *mean_iters,
+                           int *deadline_hits, int *max_iter);
 
 // --- ATU tuning carrier (host "TUNE" command) ---
 // Key the transmitter and emit a steady ~1 kHz tone so an antenna tuner can

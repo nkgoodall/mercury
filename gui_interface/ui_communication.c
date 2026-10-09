@@ -660,6 +660,8 @@ static void ui_gather_status(ui_ctx_t *ctx, ui_status_t *out)
     out->tx_peak_dbfs = modem_get_tx_peak_dbfs();
     out->freq_offset_valid = modem_get_rx_freq_offset(&out->freq_offset_hz,
                                                       &out->freq_offset_age_ms);
+    modem_get_ldpc_status(&out->ldpc_iters_last, &out->ldpc_iters_mean,
+                          &out->ldpc_deadline_hits, &out->ldpc_max_iter);
 
     out->waterfall_enabled = ctx->waterfall_enabled ? true : false;
 

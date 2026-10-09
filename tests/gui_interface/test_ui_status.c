@@ -161,7 +161,7 @@ void test_status_json_is_byte_exact(void)
         "\"bytes_transmitted\":4096,"
         "\"bytes_received\":128,"
         "\"tx_gain_db\":-15.0,"
-        "\"tx_peak_dbfs\":-3.5,"
+        "\"tx_peak_dbfs\":-3.5,\"ldpc_iters_last\":0,\"ldpc_iters_mean\":0.0,\"ldpc_deadline_hits\":0,\"ldpc_max_iter\":0,"
         "\"waterfall\":true,"
         "\"audio_ok\":true,"
         "\"audio_error\":\"\","
