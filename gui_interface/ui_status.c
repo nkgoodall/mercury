@@ -66,7 +66,6 @@ int ui_status_to_json(const ui_status_t *st, char *buf, size_t buflen)
         "\"bytes_received\":%ld,"
         "\"tx_gain_db\":%.1f,"
         "\"tx_peak_dbfs\":%.1f,"
-        "\"ldpc_iters_last\":%d,\"ldpc_iters_mean\":%.1f,\"ldpc_deadline_hits\":%d,\"ldpc_max_iter\":%d,"
         "\"waterfall\":%s,"
         "\"audio_ok\":%s,"
         "\"audio_error\":\"%s\","
@@ -85,7 +84,9 @@ int ui_status_to_json(const ui_status_t *st, char *buf, size_t buflen)
         "\"listen_mode_name\":\"%s\","
         "\"busy\":\"%s\","
         "\"broadcast\":{\"state\":\"%s\",\"cycle\":%d,\"cycles_total\":%d,\"frames_sent\":%llu},"
-        "\"hl2\":%s}",
+        "\"hl2\":%s,"
+        /* appended at the tail, per the append-only rule above (PR #359) */
+        "\"ldpc_iters_last\":%d,\"ldpc_iters_mean\":%.1f,\"ldpc_deadline_hits\":%d,\"ldpc_max_iter\":%d}",
         st->bitrate_bps,
         st->snr_db,
         st->user_callsign,
@@ -97,7 +98,6 @@ int ui_status_to_json(const ui_status_t *st, char *buf, size_t buflen)
         st->bytes_received,
         (double)st->tx_gain_db,
         (double)st->tx_peak_dbfs,
-        st->ldpc_iters_last, (double)st->ldpc_iters_mean, st->ldpc_deadline_hits, st->ldpc_max_iter,
         st->waterfall_enabled ? "true" : "false",
         st->audio_ok ? "true" : "false",
         st->audio_error,
@@ -117,7 +117,8 @@ int ui_status_to_json(const ui_status_t *st, char *buf, size_t buflen)
         st->bcast_cycle,
         st->bcast_cycles_total,
         (unsigned long long)st->bcast_frames_sent,
-        hl2);
+        hl2,
+        st->ldpc_iters_last, (double)st->ldpc_iters_mean, st->ldpc_deadline_hits, st->ldpc_max_iter);
 
     if (n < 0 || (size_t)n >= buflen)
         return -1;
