@@ -119,10 +119,9 @@ Mercury-*.apk
 # sailfish/build-mercury-ui.sh: development links and pkg-config files
 sailfish/.gl/
 
-# golden-test drivers and generated fixtures
+# utils/golden: the C bench tools (binaries) and the fixtures they generate
 utils/golden/ldpc_export
 utils/golden/ldpc_bench
 utils/golden/llr_bench
-tests/matlab/fixtures/
-tests/matlab/results/
-utils/golden/ldpc_bench_o3
+utils/golden/ldpc_sweep
+utils/golden/fixtures/
