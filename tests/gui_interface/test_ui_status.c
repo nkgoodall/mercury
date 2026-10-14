@@ -178,7 +178,7 @@ void test_status_json_is_byte_exact(void)
         "\"listen_mode_name\":\"DATAC3\","
         "\"busy\":\"broadcast\","
         "\"broadcast\":{\"state\":\"sending\",\"cycle\":2,\"cycles_total\":5,\"frames_sent\":77},"
-        "\"hl2\":null,
+        "\"hl2\":null,"
         "\"ldpc_iters_last\":0,\"ldpc_iters_mean\":0.0,\"ldpc_deadline_hits\":0,\"ldpc_max_iter\":0}";
 
     TEST_ASSERT_EQUAL_STRING(expect, buf);
@@ -196,7 +196,7 @@ void test_status_json_carries_hl2_settings(void)
     st.hl2_tx_drive = 200;
     st.hl2_pa = true;
     TEST_ASSERT_TRUE(ui_status_to_json(&st, buf, sizeof(buf)) > 0);
-    const char *tail = "\"hl2\":{\"frequency_hz\":7074000,\"rx_gain_db\":-4,\"tx_drive\":200,\"pa\":true}}";
+    const char *tail = "\"hl2\":{\"frequency_hz\":7074000,\"rx_gain_db\":-4,\"tx_drive\":200,\"pa\":true},\"ldpc_iters_last\":0,\"ldpc_iters_mean\":0.0,\"ldpc_deadline_hits\":0,\"ldpc_max_iter\":0}";
     TEST_ASSERT_EQUAL_STRING(tail, buf + strlen(buf) - strlen(tail));
 }
 
