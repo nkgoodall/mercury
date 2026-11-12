@@ -106,6 +106,11 @@ void car_set_nav_ms(uint32_t ms) { g_nav_ms = ms; }
  * older peer leaves zero: it is never asked to do anything new. */
 static bool g_short_rung = true;
 void car_set_short_rung(bool on) { g_short_rung = on; }
+/* #529 study knobs (car_set_fallback_req / _one / _s_fallback), all off. */
+static bool g_fb_req, g_fb_one, g_s_fb;
+void car_set_fallback_req(bool on) { g_fb_req = on; }
+void car_set_fallback_one(bool on) { g_fb_one = on; }
+void car_set_s_fallback(bool on) { g_s_fb = on; }
 enum { BL_NONE, BL_SMALL, BL_MEDIUM, BL_LARGE };
 #define BL_SMALL_BYTES  90    /* one DATAC3 frame's pieces, with the check and a margin */
 #define BL_MEDIUM_BYTES 460   /* ...one DATAC1 frame's */
@@ -1653,6 +1658,12 @@ static int poll_k(const car_t *c, int lv, int n) { return n > 1 && lv == 0 && c-
  * listens at the floor, where M's floor rounds and MFSK control both come
  * through.  Listening only: it costs nothing to safety. */
 #define S_FALLBACK_MS (SILENT_MS * 3 / 5)
+/* #529 study (s_fallback): the floor listen pulled in when my answer went
+ * out and brought nothing back -- past M's response slot and its turn, so a
+ * clean session's answer always re-arms the timer long first. */
+static uint32_t g_s_fb_ms = 15000;
+void car_set_s_fallback_ms(uint32_t ms) { g_s_fb_ms = ms; }
+#define FB_ANSWER_MS g_s_fb_ms
 /* Idle, M asks whether S has data -- first soon after the last traffic,
  * since the callee's application answers what it just got (UUCP's request
  * and reply), then backing off.  At 10 s and doubling across idle spells,
@@ -2582,8 +2593,14 @@ static void m_decide_send(car_t *c, uint64_t now)
     if (!has_data(c)) { m_decide_idle(c, now); return; }
     if (!answered) {
         /* At the floor silence means "keep going"; above it, or after too
-         * many, ask the receiver where it stands. */
-        if (c->m_kind == KD_ROUND && c->last_lv == 0 && c->io.pattern && ++c->floor_silent <= FLOOR_SILENT_MAX) {
+         * many, ask the receiver where it stands.  #529 study: after a
+         * fall-back the blind rounds are the slow part when S confirmed the
+         * rung and stayed on it -- ask at once (fallback_req) or after one
+         * blind round (fallback_one). */
+        if (c->m_kind == KD_ROUND && c->last_lv == 0 && c->io.pattern &&
+            (!g_fb_req || !c->fell_back) &&
+            (!g_fb_one || !c->fell_back || c->floor_silent < 1) &&
+            ++c->floor_silent <= FLOOR_SILENT_MAX) {
             car_trace(c, "tx: no answer -- continuing (%d)", c->floor_silent);
             m_plan(c, KD_ROUND, 0, 0);
             return;
@@ -2823,6 +2840,7 @@ static void s_anchor(car_t *c, int kind, uint8_t mk, uint64_t eh, uint32_t d, in
     c->anc.on = true; c->anc.kind = kind; c->anc.mk = mk; c->anc.eh = eh;
     c->anc.p = k ? slot_period(c, d, rp) : 0; c->anc.k = (uint8_t)k; c->anc.i = 0;
     c->anc.sent_round = false;
+    c->anc.opened_ms = c->heard_ms;   /* the keydown's own decode: s_heard_m ran */
     c->anc.d = d; c->anc.waited = false;
     c->idle = false;
     arm(c, CAR_T_S, eh + TG_MS);
@@ -2952,7 +2970,33 @@ static void s_slot(car_t *c, uint64_t now)
             break;
         }
     }
-    if (++c->anc.i > c->anc.k) { c->anc.on = false; return; }
+    if (++c->anc.i > c->anc.k) {
+        /* #529 study (s_fallback): this anchor had me speak to M -- I keyed
+         * my answer just now, or a keydown of mine ended since the anchor
+         * opened (my round in its poll's slots, my answer to M's round or
+         * ask) -- and nothing of M's has come back since M's own keydown
+         * ended (anc.eh): the frames I heard of it all arrived before I
+         * keyed.  What I said is unheard, and M, whose keydown was the last
+         * thing on the air before mine, will take it unanswered and fall
+         * back (fall_back_unconfirmed) to its ok_lv, which I cannot see --
+         * on air, VE4KLM-K7EK 2026-11-08, the floor 90 s later, about 118 s
+         * gone.  So I do not wait out the whole S_FALLBACK_MS: I pull the
+         * floor-listen timer (CAR_T_F, armed in s_heard_m) in to
+         * FB_ANSWER_MS from now.  M's next frame re-arms the timer long, so
+         * a wrong guess costs nothing -- on a clean turn the close fires
+         * before M's answer even comes, and M's answer re-arms it; only an
+         * M that stays silent leaves my early arm standing, and then the
+         * floor is where its blind rounds are. */
+        if (g_s_fb && c->s_prev_lv > 0 && c->rx_level != 0 && !ctl_on_floor(c) &&
+            (c->tx_busy || c->s_tx_end >= c->anc.opened_ms) &&
+            c->heard_ms <= c->anc.eh) {
+            car_trace(c, "tx: my answer went out unanswered -- floor listen in %d s",
+                      (int)(FB_ANSWER_MS / 1000));
+            arm(c, CAR_T_F, now + FB_ANSWER_MS);
+        }
+        c->anc.on = false;
+        return;
+    }
     arm(c, CAR_T_S, c->anc.eh + TG_MS + (uint64_t)c->anc.i * c->anc.p);
 }
 

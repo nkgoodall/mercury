@@ -312,10 +312,50 @@ static void oct27_recv_fallback(void)
 #endif
 }
 
-int main(int argc, char **argv)
+/* #529: the fall-back onto the floor and the callee left on the rung it
+ * confirmed -- M's blind floor rounds unheard by S, S's answer unheard by M.
+ * Frames 0, 7 and 11 of the 600-byte bidirectional session on cliff:-5 (the
+ * explorer's replay 1 0 7 11).  With CAR_S_FB the floor listen (CAR_T_F) is
+ * pulled in when S's answer goes out and brings nothing back: same bytes,
+ * sooner done.  Off by default; the pin holds only for this size. */
+static void five29_answer_unheard(void)
 {
-    if (argc == 1) {
+#if CAR_SIM_BYTES == 600
+    static const int idx[] = { 0, 7, 11 };   /* kept by carousel_sim_force_losses */
+    car_sim_result_t off, on;
+    char what[128];
+    carousel_sim_force_losses(idx, 3);
+    carousel_sim_run(1, "cliff:-5", true, LIMIT_MS, &off);
+    runs++;
+    if (!off.intact || off.done_ms != 417861) {
+        failures++;
+        printf("FAIL five29: baseline moved: intact=%d done=%llu (want OK, 417861)\n",
+               off.intact, (unsigned long long)off.done_ms);
+        printf("  The frame order changed: re-pin both times, or pick a new set with\n"
+               "  CAR_EXPLORE_CHAN=cliff:-5 CAR_TRACE=1 test_car_explore replay 1 <i> <j> <k>.\n");
+        carousel_sim_force_losses(NULL, -1);
+        return;
+    }
+    setenv("CAR_S_FB", "1", 1);
+    setenv("CAR_S_FB_MS", "45", 1);
+    carousel_sim_run(1, "cliff:-5", true, LIMIT_MS, &on);
+    unsetenv("CAR_S_FB");
+    unsetenv("CAR_S_FB_MS");
+    carousel_sim_force_losses(NULL, -1);
+    runs++;
+    snprintf(what, sizeof(what), "intact=%d done=%llu (want OK, 357891, under %llu)",
+             on.intact, (unsigned long long)on.done_ms, (unsigned long long)off.done_ms);
+    if (!on.intact || on.done_ms != 357891 || on.done_ms >= off.done_ms) {
+        failures++;
+        printf("FAIL five29: %s\n", what);
+    }
+#endif
+}
+
+int main(int argc, char **argv)
+{    if (argc == 1) {
         oct27_recv_fallback();
+        five29_answer_unheard();
         explore_losses(-1, 3);
         explore_sensing(3);
         explore_spurious(1);
@@ -352,6 +392,11 @@ int main(int argc, char **argv)
     }
     if (!strcmp(argv[1], "oct27")) {
         oct27_recv_fallback();
+        printf("%s\n", failures ? "FAILED" : "ok");
+        return failures != 0;
+    }
+    if (!strcmp(argv[1], "five29")) {
+        five29_answer_unheard();
         printf("%s\n", failures ? "FAILED" : "ok");
         return failures != 0;
     }

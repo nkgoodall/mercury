@@ -28,7 +28,8 @@ void setUp(void) {}
 void tearDown(void)
 {
     unsetenv("CAR_CS_DECODABLE"); unsetenv("CAR_CHAT"); unsetenv("CAR_CHAT_REPLY_MS"); unsetenv("CAR_BW");
-    unsetenv("CAR_SCRIPT"); unsetenv("CAR_MFSK_TX"); unsetenv("CAR_KBD");
+    unsetenv("CAR_SCRIPT"); unsetenv("CAR_MFSK_TX"); unsetenv("CAR_KBD"); unsetenv("CAR_EARLY");
+    unsetenv("CAR_FB_REQ"); unsetenv("CAR_FB_ONE"); unsetenv("CAR_S_FB");
 }
 
 static void check(uint64_t seed, const char *chan, bool bidir)

@@ -210,6 +210,8 @@ typedef struct {
         uint32_t p;                 /* slot period */
         uint8_t  k, i;              /* continuation slots; the next slot */
         bool     sent_round;        /* I sent a round in this anchor's slots */
+        uint64_t opened_ms;         /* when the anchor opened: nothing of M's
+                                     * heard since says my answer went unheard */
         uint32_t d;                 /* its lateness allowance: my start may be this late */
         bool     waited;            /* its slot 0 already waited for my application */
     } anc;
@@ -383,6 +385,14 @@ bool car_slot_reserved(const car_t *m, uint64_t start, uint64_t end);
  * car_wants_nav() says the peer may not sense it otherwise (car_set_nav_below_db). */
 void car_set_nav_ms(uint32_t ms);
 void car_set_short_rung(bool on);   /* small backlogs on the shortest rung (default on) */
+/* #529 study knobs, all default off: after an unconfirmed fall-back M asks
+ * at once (fallback_req), or after one blind round (fallback_one); and S,
+ * whose answer went out and brought nothing back, binds its listening to
+ * the floor (s_fallback) instead of waiting out its 90 s silence. */
+void car_set_fallback_req(bool on);
+void car_set_fallback_one(bool on);
+void car_set_s_fallback(bool on);
+void car_set_s_fallback_ms(uint32_t ms);   /* its floor-listen pull-in (default 15 s) */
 /* The longest keydown this station keys, in ms (0: the protocol's 30 s
  * round); rounds it accepts stay at 30 s (arq:max_keydown_s, #445).  A
  * session takes it at car_init unless its car_io_t sets one. */

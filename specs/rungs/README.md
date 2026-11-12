@@ -82,6 +82,26 @@ floor, ask (REQ) instead of continuing blind.  It needs `FloorSilence` and
 frames 0, 3 and 6 lost) is the regression test for the case the fall-back
 gets right.
 
+Measured (#529, study knobs, all off by default).  Asking at once after the
+fall-back (`CAR_FB_REQ`, the paragraph's possible fix) finishes the replay
+at 378.2 s against 417.9 s, and costs where S is usually still on the floor
+-- a REQ is a control exchange a blind round is not.  `CAR_S_FB` works from
+the other end: when S's anchor closes having spoken to M -- its round in
+M's poll's slots, its answer to M's round or ask -- with nothing of M's
+heard since M's keydown ended (`anc.eh`), M will take its round unanswered
+and fall back, so S pulls its floor listen (`CAR_T_F`, armed in
+`s_heard_m`) in to `car_set_s_fallback_ms` (45 s) instead of waiting out
+`S_FALLBACK_MS`.  M's next frame re-arms the timer long, so a wrong guess
+costs nothing -- on a clean turn the anchor closes before M's answer even
+comes, and that answer re-arms it.  45 s is calibrated: 30 s regresses
+`cliff:3` bidirectional +1005 s (M's answer can take longer than that --
+the peer's slots, then its own), 45 s is clean on cliff:20, cliff:3,
+cliff:-5, cliff:-9, fade:-5:0.5, fade:-9:0.5 and asym:-6:14, 16 seeds each
+way, and finishes the replay at 357.9 s.  `test_car_explore five29` is the
+regression; the explorer sweep passes unchanged (58 179 runs, 0 failures).
+The combined model -- `FloorSilence` with `RungAgreement`, and S's rule as
+the answer side of `FallbacksAgree` -- is pending TLC.
+
 ## FloorSilence
 
 What keeps a session alive when the channel falls below every mode but the
