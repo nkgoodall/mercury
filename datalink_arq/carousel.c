@@ -156,6 +156,13 @@ static uint32_t nav_lead(const car_t *c) { (void)c; return 0; }
 #ifndef FLOOR_SILENT_FB
 #define FLOOR_SILENT_FB   1
 #endif
+/* #529 follow-up (s_fallback): S pulls its floor listen (CAR_T_F) in when
+ * its answer went out and nothing of M's came back -- the window is derived
+ * per exchange (s_fb_window_ms), the study knob overrides it. */
+static bool g_s_fb;
+void car_set_s_fallback(bool on) { g_s_fb = on; }
+static uint32_t g_s_fb_ms;                   /* 0: derived */
+void car_set_s_fallback_ms(uint32_t ms) { g_s_fb_ms = ms; }
 #define FLOOR_LATE_MS     9000
 #define PATTERN_AIR_MS    640
 /* After a pattern above the floor the sender keys later than after a poll:
@@ -1820,6 +1827,24 @@ static uint32_t r_cap_ms(const car_t *c)
 }
 static uint32_t d_of_mode(int mode) { return mercury_mode_is_mfsk(mode) ? D_MFSK_MS : D_OFDM_MS; }
 uint32_t car_decode_bound_ms(int mode) { return d_of_mode(mode); }
+/* #529 (s_fallback): how long S's pulled-in floor listen waits, from the
+ * anchor's close, for an M that will answer.  Derived from what S knows of
+ * the exchange, not a constant: M decodes my keydown's end at the latest
+ * D_MFSK_MS after it ends (whichever mode I keyed), keeps clear of my
+ * anchor's slots until they pass (they have: this runs at the close), waits
+ * its guard, and keys its answer on the rung I confirmed -- at most its
+ * keydown cap of frames, lead and tail in.  Past that an M that has not
+ * answered is not slow, it is unheard-from, and the floor is where its
+ * blind rounds and MFSK control come through.  On air the fixed 45 s this
+ * replaces pulled S to the floor under a slow but living M (nvis two-way,
+ * #529: 4 of 16 seeds 0.6-2.2 ks slower); a window too small regresses
+ * exactly there, so the cap term grows with the rung's frame time. */
+static uint32_t s_fb_window_ms(const car_t *c)
+{
+    if (g_s_fb_ms) return g_s_fb_ms;         /* the study knob (seconds, in ms) */
+    return D_MFSK_MS + TURN_G_MS +
+           s_round_ms(c, c->s_prev_lv, peer_keydown_cap(c, c->s_prev_lv)) + TURN_G_MS;
+}
 /* The slot period of an anchor S learned up to d late, whose rounds are at
  * most r: the round, then room for M to hear it end (however late it began)
  * and answer with control, guarded.  A continuation slot opens only after
@@ -3110,6 +3135,7 @@ static void s_anchor(car_t *c, int kind, uint8_t mk, uint64_t eh, uint32_t d, in
     c->anc.on = true; c->anc.kind = kind; c->anc.mk = mk; c->anc.eh = eh;
     c->anc.p = k ? slot_period(c, d, rp) : 0; c->anc.k = (uint8_t)k; c->anc.i = 0;
     c->anc.sent_round = false;
+    c->anc.opened_ms = c->heard_ms;   /* the keydown's own decode: s_heard_m ran */
     c->anc.d = d; c->anc.waited = false;
     c->idle = false;
     arm(c, CAR_T_S, eh + TG_MS);
@@ -3239,7 +3265,40 @@ static void s_slot(car_t *c, uint64_t now)
             break;
         }
     }
-    if (++c->anc.i > c->anc.k) { c->anc.on = false; return; }
+    if (++c->anc.i > c->anc.k) {
+        /* #529 (s_fallback): this anchor had me speak to M -- a round in
+         * its poll's slots, my answer to its round or ask -- and nothing of
+         * M's has come back since M's own keydown ended (anc.eh): the
+         * frames I heard of it all arrived before I keyed.  What I said is
+         * unheard, and M, whose keydown was the last thing on the air
+         * before mine, will take it unanswered and fall back to its ok_lv,
+         * which I cannot see -- on air, VE4KLM-K7EK 2026-11-08, the floor
+         * 90 s later, about 118 s gone (#529).  So I do not wait out the
+         * whole S_FALLBACK_MS: I pull the floor-listen timer (CAR_T_F,
+         * armed in s_heard_m) in to s_fb_window_ms from now.  M's next
+         * frame re-arms the timer long, so a wrong guess costs nothing --
+         * on a clean turn the close fires before M's answer even comes, and
+         * that answer re-arms it; only an M that stays silent leaves my
+         * early arm standing, and then the floor is where its blind rounds
+         * and its MFSK control are. */
+        if (g_s_fb && c->s_prev_lv > 0 && c->rx_level != 0 && !ctl_on_floor(c) &&
+            (c->tx_busy || c->s_tx_end >= c->anc.opened_ms) &&
+            c->heard_ms <= c->anc.eh &&
+            /* Only where M's control will not re-anchor me anyway (#578's
+             * REQ decodes here whatever my payload bind): with the channel
+             * above the control-deaf band, binding my payload to the floor
+             * only slows my answers and drags M down with me while it is
+             * stepping rungs (nvis two-way, #529).  Below it, M's DATAC16
+             * is as lost as its rounds, and the floor is the only thing
+             * left that hears either of us. */
+            (!c->snr_valid || c->snr_ema < CTL_DEAF_ON_DB)) {
+            car_trace(c, "tx: my answer went out unanswered -- floor listen in %u s",
+                      s_fb_window_ms(c) / 1000);
+            arm(c, CAR_T_F, now + s_fb_window_ms(c));
+        }
+        c->anc.on = false;
+        return;
+    }
     arm(c, CAR_T_S, c->anc.eh + TG_MS + (uint64_t)c->anc.i * c->anc.p);
 }
 

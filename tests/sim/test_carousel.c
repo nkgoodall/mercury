@@ -29,6 +29,7 @@ void tearDown(void)
 {
     unsetenv("CAR_CS_DECODABLE"); unsetenv("CAR_CHAT"); unsetenv("CAR_CHAT_REPLY_MS"); unsetenv("CAR_BW");
     unsetenv("CAR_SCRIPT"); unsetenv("CAR_MFSK_TX"); unsetenv("CAR_KBD");
+    unsetenv("CAR_S_FB"); unsetenv("CAR_S_FB_MS");
     unsetenv("CAR_CTL_SNR_OFFSET"); unsetenv("CAR_NOISE");
 }
 
